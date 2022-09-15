@@ -45,7 +45,7 @@ type Interpreter struct {
 
 // getArgument figures out the correct parameter mode for a specific argument.
 // The argument index is one-based.
-func (i *Interpreter) getArgument(modes int, argIdx int, opSize int) OPArgument {
+func (i *Interpreter) getArgument(modes int, argIdx int) OPArgument {
 	// Do some math to extract the mode
 	mode := (modes / powerOfTen(argIdx-1)) % 10
 
@@ -88,34 +88,82 @@ func (i *Interpreter) ExecOne() (more bool) {
 	case 1:
 		// ADD
 		opSize = 4
-		src1 := i.getArgument(modes, 1, opSize)
-		src2 := i.getArgument(modes, 2, opSize)
-		dest := i.getArgument(modes, 3, opSize)
+		src1 := i.getArgument(modes, 1)
+		src2 := i.getArgument(modes, 2)
+		dest := i.getArgument(modes, 3)
 
 		dest.Set(src1.Get() + src2.Get())
 
 	case 2:
 		// MUL
 		opSize = 4
-		src1 := i.getArgument(modes, 1, opSize)
-		src2 := i.getArgument(modes, 2, opSize)
-		dest := i.getArgument(modes, 3, opSize)
+		src1 := i.getArgument(modes, 1)
+		src2 := i.getArgument(modes, 2)
+		dest := i.getArgument(modes, 3)
 
 		dest.Set(src1.Get() * src2.Get())
 
 	case 3:
 		// INPUT
 		opSize = 2
-		dest := i.getArgument(modes, 1, opSize)
+		dest := i.getArgument(modes, 1)
 
 		dest.Set(i.performIn())
 
 	case 4:
 		// OUTPUT
 		opSize = 2
-		src := i.getArgument(modes, 1, opSize)
+		src := i.getArgument(modes, 1)
 
 		i.performOut(src.Get())
+
+	case 5:
+		// JUMP-IF-TRUE
+		opSize = 3
+		src := i.getArgument(modes, 1)
+		dest := i.getArgument(modes, 2)
+
+		if src.Get() != 0 {
+			i.IP = dest.Get()
+			opSize = 0
+		}
+
+	case 6:
+		// JUMP-IF-FALSE
+		opSize = 3
+		src := i.getArgument(modes, 1)
+		dest := i.getArgument(modes, 2)
+
+		if src.Get() == 0 {
+			i.IP = dest.Get()
+			opSize = 0
+		}
+
+	case 7:
+		// LESS-THAN
+		opSize = 4
+		src1 := i.getArgument(modes, 1)
+		src2 := i.getArgument(modes, 2)
+		dest := i.getArgument(modes, 3)
+
+		if src1.Get() < src2.Get() {
+			dest.Set(1)
+		} else {
+			dest.Set(0)
+		}
+
+	case 8:
+		// EQ
+		opSize = 4
+		src1 := i.getArgument(modes, 1)
+		src2 := i.getArgument(modes, 2)
+		dest := i.getArgument(modes, 3)
+
+		if src1.Get() == src2.Get() {
+			dest.Set(1)
+		} else {
+			dest.Set(0)
+		}
 
 	case 99:
 		// HALT

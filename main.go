@@ -25,6 +25,7 @@ var solutions = map[string]func(io.Reader) any{
 	"04a": day04.SolveA,
 	"04b": day04.SolveB,
 	"05a": day05.SolveA,
+	"05b": day05.SolveB,
 }
 
 func loadInput(day string, test bool) io.ReadCloser {

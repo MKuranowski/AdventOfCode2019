@@ -13,3 +13,9 @@ func SolveA(r io.Reader) any {
 	i.ExecAll()
 	return nil
 }
+
+func SolveB(r io.Reader) any {
+	i := intcode.NewInterpreterWithIO(r, strings.NewReader("5"), os.Stdout)
+	i.ExecAll()
+	return nil
+}
