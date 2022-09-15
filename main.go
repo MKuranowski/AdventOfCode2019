@@ -12,6 +12,7 @@ import (
 	"github.com/MKuranowski/AdventOfCode2019/day02"
 	"github.com/MKuranowski/AdventOfCode2019/day03"
 	"github.com/MKuranowski/AdventOfCode2019/day04"
+	"github.com/MKuranowski/AdventOfCode2019/day05"
 )
 
 var solutions = map[string]func(io.Reader) any{
@@ -23,6 +24,7 @@ var solutions = map[string]func(io.Reader) any{
 	"03b": day03.SolveB,
 	"04a": day04.SolveA,
 	"04b": day04.SolveB,
+	"05a": day05.SolveA,
 }
 
 func loadInput(day string, test bool) io.ReadCloser {
@@ -78,5 +80,7 @@ func main() {
 
 	// Perform the solution and print the result
 	result := solver(f)
-	fmt.Println(result)
+	if result != nil {
+		fmt.Println(result)
+	}
 }
