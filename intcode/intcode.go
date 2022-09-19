@@ -180,6 +180,13 @@ func (i *Interpreter) ExecOne() (more bool) {
 func (i *Interpreter) ExecAll() {
 	for i.ExecOne() {
 	}
+
+	if i, ok := i.Input.(*io.PipeReader); ok {
+		i.Close()
+	}
+	if o, ok := i.Output.(*io.PipeWriter); ok {
+		o.Close()
+	}
 }
 
 func (i *Interpreter) Clone() *Interpreter {
