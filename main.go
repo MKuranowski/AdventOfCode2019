@@ -15,6 +15,7 @@ import (
 	"github.com/MKuranowski/AdventOfCode2019/day05"
 	"github.com/MKuranowski/AdventOfCode2019/day06"
 	"github.com/MKuranowski/AdventOfCode2019/day07"
+	"github.com/MKuranowski/AdventOfCode2019/day08"
 )
 
 var solutions = map[string]func(io.Reader) any{
@@ -32,6 +33,8 @@ var solutions = map[string]func(io.Reader) any{
 	"06b": day06.SolveB,
 	"07a": day07.SolveA,
 	"07b": day07.SolveB,
+	"08a": day08.SolveA,
+	"08b": day08.SolveB,
 }
 
 func loadInput(day string, test bool) io.ReadCloser {
@@ -82,7 +85,7 @@ func main() {
 	// Get the solver function
 	solver, ok := solutions[day]
 	if !ok {
-		panic(fmt.Errorf("no solution for day %q", day))
+		panic(fmt.Errorf("no solver for %q in main.go lookup table", day))
 	}
 
 	// Perform the solution and print the result
