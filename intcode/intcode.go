@@ -26,6 +26,16 @@ type MemoryReference struct {
 	*int
 }
 
+func NewMemoryReference(i *Interpreter, idx int) MemoryReference {
+	if idx >= len(i.Memory) {
+		newMemory := make([]int, idx+1)
+		copy(newMemory, i.Memory)
+		i.Memory = newMemory
+	}
+
+	return MemoryReference{&i.Memory[idx]}
+}
+
 func (r MemoryReference) Get() int  { return *r.int }
 func (r MemoryReference) Set(x int) { *r.int = x }
 
@@ -35,9 +45,10 @@ func (r Immediate) Get() int { return int(r) }
 func (r Immediate) Set(int)  { panic("intcode.Interpreter - can't set an immediate value") }
 
 type Interpreter struct {
-	Memory []int
-	IP     int
-	Halted bool
+	Memory       []int
+	IP           int
+	Halted       bool
+	RelativeBase int
 
 	Input  io.Reader
 	Output io.Writer
@@ -51,9 +62,11 @@ func (i *Interpreter) getArgument(modes int, argIdx int) OPArgument {
 
 	switch mode {
 	case 0:
-		return MemoryReference{&i.Memory[i.Memory[i.IP+argIdx]]}
+		return NewMemoryReference(i, i.Memory[i.IP+argIdx])
 	case 1:
 		return Immediate(i.Memory[i.IP+argIdx])
+	case 2:
+		return NewMemoryReference(i, i.RelativeBase+i.Memory[i.IP+argIdx])
 	default:
 		panic("intcode.Interpreter - unsupported parameter mode")
 	}
@@ -164,6 +177,12 @@ func (i *Interpreter) ExecOne() (more bool) {
 		} else {
 			dest.Set(0)
 		}
+
+	case 9:
+		// ADJUST RELATIVE BASE
+		opSize = 2
+		src := i.getArgument(modes, 1)
+		i.RelativeBase += src.Get()
 
 	case 99:
 		// HALT
