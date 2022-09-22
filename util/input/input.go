@@ -33,3 +33,13 @@ func (i *LineIterator) Next() bool {
 	i.line = strings.TrimRight(l, "\n")
 	return true
 }
+
+func SendInteger(n int, w io.Writer) (err error) {
+	_, err = fmt.Fprintln(w, n)
+	return err
+}
+
+func ReceiveInteger(r io.Reader) (n int, err error) {
+	_, err = fmt.Fscan(r, &n)
+	return
+}

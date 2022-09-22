@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"testing/iotest"
+
+	"github.com/MKuranowski/AdventOfCode2019/util/input"
 )
 
 func powerOfTen(x int) (result int) {
@@ -73,16 +75,15 @@ func (i *Interpreter) getArgument(modes int, argIdx int) OPArgument {
 }
 
 func (i *Interpreter) performIn() (x int) {
-	_, err := fmt.Fscan(i.Input, &x)
-	if err != nil {
+	err := error(nil)
+	if x, err = input.ReceiveInteger(i.Input); err != nil {
 		panic(fmt.Errorf("intcode.Interpreter - INPUT op failed: %w", err))
 	}
 	return x
 }
 
 func (i *Interpreter) performOut(x int) {
-	_, err := fmt.Fprintln(i.Output, x)
-	if err != nil {
+	if err := input.SendInteger(x, i.Output); err != nil {
 		panic(fmt.Errorf("intcode.Interpreter - OUTPUT op failed: %w", err))
 	}
 }
