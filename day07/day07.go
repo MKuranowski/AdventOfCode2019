@@ -1,11 +1,8 @@
 package day07
 
 import (
-	"fmt"
 	"io"
 	"math"
-	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/MKuranowski/AdventOfCode2019/intcode"
@@ -28,20 +25,21 @@ func SolveA(r io.Reader) any {
 		wg := &sync.WaitGroup{}
 
 		// The input of the first amp is 0
-		lastOutput := io.Reader(strings.NewReader("0\n"))
+		// NOTE: Channels need to be buffered to send the phase setting before starting the amplifier
+		firstInput := make(chan int, 1)
+		lastOutput := firstInput
 
 		// Launch all amps chaining their inputs and outputs
 		for i := 0; i < amps; i++ {
 			amp := prog.Clone()
 
 			// Set the amp's input - previous amplifier's output
-			amp.Input = io.MultiReader(
-				strings.NewReader(fmt.Sprintln(phases[i])),
-				lastOutput,
-			)
+			lastOutput <- phases[i]
+			amp.Input = lastOutput
 
 			// Connect output
-			lastOutput, amp.Output = io.Pipe()
+			lastOutput = make(chan int, 1)
+			amp.Output = lastOutput
 
 			// Run the amplifier
 			wg.Add(1)
@@ -51,17 +49,9 @@ func SolveA(r io.Reader) any {
 			}(amp)
 		}
 
-		powerStr, err := io.ReadAll(lastOutput)
-		if err != nil {
-			panic(fmt.Errorf("failed to read from last amplifier: %w", err))
-		}
-
+		firstInput <- 0
 		wg.Wait()
-
-		power, err := strconv.Atoi(strings.TrimRight(string(powerStr), "\n"))
-		if err != nil {
-			panic(fmt.Errorf("last amplifier didn't send a number (%q): %w", string(powerStr), err))
-		}
+		power := <-lastOutput
 
 		if power > maxPower {
 			maxPower = power
@@ -85,59 +75,40 @@ func SolveB(r io.Reader) any {
 	// Iterate over every possible permutation of phase settings
 	for phases := range perm.QuickPerm(permInput) {
 		wg := &sync.WaitGroup{}
-		aDone := make(chan struct{})
 
-		// The input of the first amp is 0
-		loopReader, loopWriter := io.Pipe()
-		lastOutput := io.MultiReader(strings.NewReader("0\n"), loopReader)
+		// Create the very first channel which loops around
+		// NOTE: Channels need to be buffered to send the phase setting before starting the amplifier
+		loop := make(chan int, 1)
+		lastOutput := loop
 
 		// Launch all amps chaining their inputs and outputs
 		for i := 0; i < amps; i++ {
 			amp := prog.Clone()
 
 			// Set the amp's input - previous amplifier's output
-			amp.Input = io.MultiReader(
-				strings.NewReader(fmt.Sprintln(phases[i])),
-				lastOutput,
-			)
+			amp.Input = lastOutput
+			lastOutput <- phases[i]
 
 			// Connect output
 			if i == amps-1 {
-				amp.Output = loopWriter
-				lastOutput = loopReader
+				lastOutput = loop
+				amp.Output = loop
 			} else {
-				lastOutput, amp.Output = io.Pipe()
+				lastOutput = make(chan int, 1)
+				amp.Output = lastOutput
 			}
 
 			// Run the amplifier
 			wg.Add(1)
-			if i == 0 {
-				go func(amp *intcode.Interpreter) {
-					defer wg.Done()
-					defer close(aDone)
-					amp.ExecAll()
-				}(amp)
-			} else {
-				go func(amp *intcode.Interpreter) {
-					defer wg.Done()
-					amp.ExecAll()
-				}(amp)
-			}
+			go func(amp *intcode.Interpreter, i int) {
+				defer wg.Done()
+				amp.ExecAll()
+			}(amp, i)
 		}
 
-		<-aDone
-
-		powerStr, err := io.ReadAll(lastOutput)
-		if err != nil {
-			panic(fmt.Errorf("failed to read from last amplifier: %w", err))
-		}
-
+		loop <- 0
 		wg.Wait()
-
-		power, err := strconv.Atoi(strings.TrimRight(string(powerStr), "\n"))
-		if err != nil {
-			panic(fmt.Errorf("last amplifier didn't send a number (%q): %w", string(powerStr), err))
-		}
+		power := <-loop
 
 		if power > maxPower {
 			maxPower = power

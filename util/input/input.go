@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 )
 
 type LineIterator struct {
@@ -34,12 +35,27 @@ func (i *LineIterator) Next() bool {
 	return true
 }
 
-func SendInteger(n int, w io.Writer) (err error) {
-	_, err = fmt.Fprintln(w, n)
-	return err
+func StaticSender(ch chan<- int, wg *sync.WaitGroup, numbers ...int) {
+	defer func() {
+		if wg != nil {
+			wg.Done()
+		}
+	}()
+	defer close(ch)
+
+	for _, num := range numbers {
+		ch <- num
+	}
 }
 
-func ReceiveInteger(r io.Reader) (n int, err error) {
-	_, err = fmt.Fscan(r, &n)
-	return
+func StdoutReceiver(ch <-chan int, wg *sync.WaitGroup) {
+	defer func() {
+		if wg != nil {
+			wg.Done()
+		}
+	}()
+
+	for num := range ch {
+		fmt.Println(num)
+	}
 }

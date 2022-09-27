@@ -1,14 +1,12 @@
 package day11
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"math"
 	"sync"
 
 	"github.com/MKuranowski/AdventOfCode2019/intcode"
-	"github.com/MKuranowski/AdventOfCode2019/util/input"
 )
 
 type Point struct {
@@ -32,10 +30,7 @@ const (
 )
 
 type Painter struct {
-	Program     *intcode.Interpreter
-	CameraInput io.Writer
-	ProgOutput  io.Reader
-
+	Program  *intcode.Interpreter
 	Colors   map[Point]Color
 	Position Point
 	Heading  Direction
@@ -43,9 +38,7 @@ type Painter struct {
 
 func NewPainter(intcodeProgram io.Reader) (p *Painter) {
 	p = &Painter{}
-	p.Program = intcode.NewInterpreter(intcodeProgram)
-	p.Program.Input, p.CameraInput = io.Pipe()
-	p.ProgOutput, p.Program.Output = io.Pipe()
+	p.Program = intcode.NewInterpreterNewIO(intcodeProgram)
 
 	p.Colors = make(map[Point]Color)
 	return p
@@ -74,24 +67,19 @@ func (p *Painter) ExecAll() {
 	}()
 
 	// Operate the painter
+PainterLoop:
 	for {
 		// Send the color of the current tile
-		err := input.SendInteger(int(p.Colors[p.Position]), p.CameraInput)
-		if errors.Is(err, io.ErrClosedPipe) {
-			break
-		} else if err != nil {
-			panic(fmt.Errorf("failed to send data to the intcode Interpreter: %w", err))
+		select {
+		case <-p.Program.Halted:
+			break PainterLoop
+		case p.Program.Input <- int(p.Colors[p.Position]):
+			// Successfully sent the current tile - continue waiting for robot input
 		}
 
 		// Read whatever the robot has sent
-		color, err := input.ReceiveInteger(p.ProgOutput)
-		if err != nil {
-			panic(fmt.Errorf("failed to read data from the intcode Interpreter: %w", err))
-		}
-		rotation, err := input.ReceiveInteger(p.ProgOutput)
-		if err != nil {
-			panic(fmt.Errorf("failed to read data from the intcode Interpreter: %w", err))
-		}
+		color := <-p.Program.Output
+		rotation := <-p.Program.Output
 
 		// Paint the panel
 		p.Colors[p.Position] = Color(color)
@@ -133,6 +121,7 @@ func (p *Painter) ExecAll() {
 	}
 
 	// Wait for the program to finish
+	close(p.Program.Input)
 	wg.Wait()
 }
 

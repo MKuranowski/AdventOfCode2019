@@ -6,9 +6,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"testing/iotest"
-
-	"github.com/MKuranowski/AdventOfCode2019/util/input"
 )
 
 func powerOfTen(x int) (result int) {
@@ -49,11 +46,11 @@ func (r Immediate) Set(int)  { panic("intcode.Interpreter - can't set an immedia
 type Interpreter struct {
 	Memory       []int
 	IP           int
-	Halted       bool
+	Halted       chan struct{}
 	RelativeBase int
 
-	Input  io.Reader
-	Output io.Writer
+	Input  chan int
+	Output chan int
 }
 
 // getArgument figures out the correct parameter mode for a specific argument.
@@ -74,22 +71,26 @@ func (i *Interpreter) getArgument(modes int, argIdx int) OPArgument {
 	}
 }
 
-func (i *Interpreter) performIn() (x int) {
-	err := error(nil)
-	if x, err = input.ReceiveInteger(i.Input); err != nil {
-		panic(fmt.Errorf("intcode.Interpreter - INPUT op failed: %w", err))
+func (i *Interpreter) performIn() int {
+	if i.Input == nil {
+		panic(fmt.Errorf("input over nil channel"))
+	}
+	x, ok := <-i.Input
+	if !ok {
+		panic(fmt.Errorf("input over closed channel"))
 	}
 	return x
 }
 
 func (i *Interpreter) performOut(x int) {
-	if err := input.SendInteger(x, i.Output); err != nil {
-		panic(fmt.Errorf("intcode.Interpreter - OUTPUT op failed: %w", err))
+	if i.Output == nil {
+		panic(fmt.Errorf("output over nil channel"))
 	}
+	i.Output <- x
 }
 
 func (i *Interpreter) ExecOne() (more bool) {
-	if i.Halted {
+	if i.IsHalted() {
 		return false
 	}
 
@@ -187,42 +188,56 @@ func (i *Interpreter) ExecOne() (more bool) {
 
 	case 99:
 		// HALT
-		i.Halted = true
+		close(i.Halted)
 
 	default:
 		panic(fmt.Errorf("unknown opcode in IntCodeInterpreter: %d", op))
 	}
 
 	i.IP += opSize
-	return !i.Halted
+	return !i.IsHalted()
 }
 
 func (i *Interpreter) ExecAll() {
 	for i.ExecOne() {
 	}
 
-	if i, ok := i.Input.(*io.PipeReader); ok {
-		i.Close()
-	}
-	if o, ok := i.Output.(*io.PipeWriter); ok {
-		o.Close()
+	if i.Output != nil {
+		close(i.Output)
 	}
 }
 
-func (i *Interpreter) Clone() *Interpreter {
-	return &Interpreter{
+func (i *Interpreter) Clone() (new *Interpreter) {
+	new = &Interpreter{
 		Memory: append([]int(nil), i.Memory...),
 		IP:     i.IP,
-		Halted: i.Halted,
+		Halted: make(chan struct{}),
+	}
+	if i.IsHalted() {
+		close(new.Halted)
+	}
+	return
+}
+
+func (i *Interpreter) IsHalted() bool {
+	select {
+	case <-i.Halted:
+		return true
+	default:
+		return false
 	}
 }
 
 func NewInterpreter(program io.Reader) *Interpreter {
-	return NewInterpreterWithIO(program, iotest.ErrReader(io.EOF), io.Discard)
+	return NewInterpreterWithIO(program, nil, nil)
 }
 
-func NewInterpreterWithIO(program io.Reader, input io.Reader, output io.Writer) *Interpreter {
-	i := &Interpreter{Input: input, Output: output}
+func NewInterpreterNewIO(program io.Reader) *Interpreter {
+	return NewInterpreterWithIO(program, make(chan int), make(chan int))
+}
+
+func NewInterpreterWithIO(program io.Reader, input, output chan int) *Interpreter {
+	i := &Interpreter{Input: input, Output: output, Halted: make(chan struct{})}
 	br := bufio.NewReader(program)
 
 	eof := false
