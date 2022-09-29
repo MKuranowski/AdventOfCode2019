@@ -2,6 +2,10 @@ package intmath
 
 import "math"
 
+type Point struct {
+	X, Y int
+}
+
 func Gcd(a, b int) int {
 	if b == 0 {
 		return a
@@ -39,4 +43,21 @@ func Max(xs ...int) (max int) {
 		}
 	}
 	return
+}
+
+func Abs(x int) int {
+	if x < 0 {
+		x = -x
+	}
+	return x
+}
+
+func DistSquared(x1, y1, x2, y2 int) int {
+	dx := x2 - x1
+	dy := y2 - y1
+	return dx*dx + dy*dy
+}
+
+func DistManhattan(x1, y1, x2, y2 int) int {
+	return Abs(x2-x1) + Abs(y2-y1)
 }
