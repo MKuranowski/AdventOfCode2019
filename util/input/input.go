@@ -59,3 +59,15 @@ func StdoutReceiver(ch <-chan int, wg *sync.WaitGroup) {
 		fmt.Println(num)
 	}
 }
+
+func AsciiStdoutReceiver(ch <-chan int, wg *sync.WaitGroup) {
+	defer func() {
+		if wg != nil {
+			wg.Done()
+		}
+	}()
+
+	for c := range ch {
+		fmt.Printf("%c", c)
+	}
+}
