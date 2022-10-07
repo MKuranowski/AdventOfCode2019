@@ -13,6 +13,8 @@ import (
 	"golang.org/x/exp/maps"
 )
 
+var startPoints = [4]byte{'1', '2', '3', '4'}
+
 type Point struct{ X, Y int }
 
 func NeighborsOf(p Point) [4]Point {
@@ -172,7 +174,7 @@ func MazeToSimpleGraph(m MazeData, startCh byte) (g MazeGraph) {
 
 type shortestPathQueueEntryHash struct {
 	Keys KeySet
-	At   byte
+	At   [4]byte
 }
 
 type shortestPathQueueEntry struct {
@@ -208,13 +210,13 @@ func (q *shortestPathQueue) Pop() any {
 	return r
 }
 
-func FindShortestPath(g MazeGraph, allKeysCount int) int {
+func FindShortestPath(g MazeGraph, allKeysCount, numberOfRobots int) int {
 	entries := make(map[shortestPathQueueEntryHash]*shortestPathQueueEntry)
 	queue := &shortestPathQueue{}
 
 	{
 		initialEntry := &shortestPathQueueEntry{
-			shortestPathQueueEntryHash{0, '@'},
+			shortestPathQueueEntryHash{0, startPoints},
 			0,
 			0,
 		}
@@ -229,31 +231,34 @@ func FindShortestPath(g MazeGraph, allKeysCount int) int {
 			return e.Cost
 		}
 
-		for neighbor, edge := range g[e.At] {
-			if !e.Keys.IsSuperset(edge.Doors) {
-				// Don't have the keys to open doors en-route to neighbor!
-				continue
-			}
+		for robot := 0; robot < numberOfRobots; robot++ {
+			for neighbor, edge := range g[e.At[robot]] {
+				if !e.Keys.IsSuperset(edge.Doors) {
+					// Don't have the keys to open doors en-route to neighbor!
+					continue
+				}
 
-			n := &shortestPathQueueEntry{
-				shortestPathQueueEntryHash{e.Keys, neighbor},
-				e.Cost + edge.Steps,
-				-1,
-			}
-			n.Keys.Add(neighbor)
+				n := &shortestPathQueueEntry{
+					shortestPathQueueEntryHash{e.Keys, e.At},
+					e.Cost + edge.Steps,
+					-1,
+				}
+				n.At[robot] = neighbor
+				n.Keys.Add(neighbor)
 
-			// Check if a cheaper route to this state exists
-			existing := entries[n.shortestPathQueueEntryHash]
-			if existing != nil && existing.Cost < n.Cost {
-				continue
-			} else if existing != nil {
-				// Remove the more expensive entry from the queue, to keep the queue as short as possible
-				heap.Remove(queue, existing.Index)
-			}
+				// Check if a cheaper route to this state exists
+				existing := entries[n.shortestPathQueueEntryHash]
+				if existing != nil && existing.Cost < n.Cost {
+					continue
+				} else if existing != nil {
+					// Remove the more expensive entry from the queue, to keep the queue as short as possible
+					heap.Remove(queue, existing.Index)
+				}
 
-			// Push the new state onto the queue
-			entries[n.shortestPathQueueEntryHash] = n
-			heap.Push(queue, n)
+				// Push the new state onto the queue
+				entries[n.shortestPathQueueEntryHash] = n
+				heap.Push(queue, n)
+			}
 		}
 	}
 
@@ -271,56 +276,44 @@ func DumpGraph(g MazeGraph, w io.Writer) {
 
 func SolveA(r io.Reader) any {
 	m := LoadMaze(r)
-	g := MazeToSimpleGraph(m, '@')
-	// DumpGraph(g, os.Stderr)
-	return FindShortestPath(g, len(m.Keys))
+	g := MazeToSimpleGraph(m, startPoints[0])
+	return FindShortestPath(g, len(m.Keys), 1)
 }
 
 func SplitMaze(m MazeData) (r [4]MazeData) {
 	for i := range r {
-		r[i].M = make(Map)
-		r[i].Keys = make(map[byte]Point)
-		r[i].Doors = make(map[byte]Point)
+		r[i].M = m.M
+		r[i].Keys = m.Keys
+		r[i].Doors = m.Doors
 	}
+
 	r[0].Start = Point{m.Start.X - 1, m.Start.Y - 1}
 	r[1].Start = Point{m.Start.X - 1, m.Start.Y + 1}
 	r[2].Start = Point{m.Start.X + 1, m.Start.Y - 1}
 	r[3].Start = Point{m.Start.X + 1, m.Start.Y + 1}
 
-	for pt, c := range m.M {
-		var target *MazeData
-		if pt.X < m.Start.X && pt.Y < m.Start.Y {
-			target = &r[0]
-		} else if pt.X < m.Start.X && pt.Y > m.Start.Y {
-			target = &r[1]
-		} else if pt.X > m.Start.X && pt.Y < m.Start.Y {
-			target = &r[2]
-		} else if pt.X > m.Start.X && pt.Y > m.Start.Y {
-			target = &r[3]
-		} else {
-			continue
-		}
+	m.M[Point{m.Start.X - 1, m.Start.Y - 1}] = '.'
+	delete(m.M, Point{m.Start.X, m.Start.Y - 1})
+	m.M[Point{m.Start.X + 1, m.Start.Y - 1}] = '.'
 
-		target.M[pt] = c
-		if ascii.IsLower(c) {
-			target.Keys[c] = pt
-		} else if ascii.IsUpper(c) {
-			target.Doors[c] = pt
-		}
-	}
+	delete(m.M, Point{m.Start.X - 1, m.Start.Y})
+	delete(m.M, Point{m.Start.X, m.Start.Y - 1})
+	delete(m.M, Point{m.Start.X + 1, m.Start.Y})
+
+	m.M[Point{m.Start.X - 1, m.Start.Y + 1}] = '.'
+	delete(m.M, Point{m.Start.X, m.Start.Y + 1})
+	m.M[Point{m.Start.X + 1, m.Start.Y + 1}] = '.'
 
 	return
 }
-
-var startPoints = [4]byte{'1', '2', '3', '4'}
 
 func SolveB(r io.Reader) any {
 	m := LoadMaze(r)
 
 	g := make(MazeGraph)
-	for i, part := range SplitMaze(m) {
-		maps.Copy(g, MazeToSimpleGraph(part, startPoints[i]))
+	for i, m := range SplitMaze(m) {
+		maps.Copy(g, MazeToSimpleGraph(m, startPoints[i]))
 	}
 
-	return nil
+	return FindShortestPath(g, len(m.Keys), 4)
 }
