@@ -2,11 +2,11 @@ package day18
 
 import (
 	"bufio"
+	"container/heap"
 	"errors"
 	"fmt"
 	"io"
 	"math/bits"
-	"os"
 
 	"github.com/MKuranowski/AdventOfCode2019/util/ascii"
 	"github.com/MKuranowski/AdventOfCode2019/util/gheap"
@@ -16,10 +16,10 @@ type Point struct{ X, Y int }
 
 func NeighborsOf(p Point) [4]Point {
 	return [...]Point{
-		{p.X - 1, p.Y - 1},
-		{p.X + 1, p.Y - 1},
-		{p.X - 1, p.Y + 1},
-		{p.X + 1, p.Y + 1},
+		{p.X - 1, p.Y},
+		{p.X + 1, p.Y},
+		{p.X, p.Y - 1},
+		{p.X, p.Y + 1},
 	}
 }
 
@@ -131,7 +131,7 @@ func generateSimpleEdgesFrom(m MazeData, from Point) (t map[byte]MazeGraphEdge) 
 		elem := q.Pop()
 		elemType := m.M[elem.P]
 
-		if ascii.IsLower(elemType) {
+		if ascii.IsLower(elemType) && elem.P != from {
 			t[elemType] = MazeGraphEdge{elem.C, elem.Doors}
 		}
 
@@ -176,18 +176,53 @@ type shortestPathQueueEntryHash struct {
 
 type shortestPathQueueEntry struct {
 	shortestPathQueueEntryHash
-	Cost int
+	Cost  int
+	Index int
+}
+
+type shortestPathQueue []*shortestPathQueueEntry
+
+func (q shortestPathQueue) Len() int { return len(q) }
+
+func (q shortestPathQueue) Less(i, j int) bool { return q[i].Cost < q[j].Cost }
+
+func (q shortestPathQueue) Swap(i, j int) {
+	q[i], q[j] = q[j], q[i]
+	q[i].Index = i
+	q[j].Index = j
+}
+
+func (q *shortestPathQueue) Push(x any) {
+	item := x.(*shortestPathQueueEntry)
+	item.Index = len(*q)
+	*q = append(*q, item)
+}
+
+func (q *shortestPathQueue) Pop() any {
+	l := len(*q)
+	r := (*q)[l-1]
+	(*q)[l-1] = nil
+	*q = (*q)[:l-1]
+	r.Index = -1
+	return r
 }
 
 func FindShortestPath(g MazeGraph, allKeysCount int) int {
-	costs := make(map[shortestPathQueueEntryHash]int)
-	queue := gheap.NewGenericHeap(func(a, b shortestPathQueueEntry) bool { return a.Cost < b.Cost })
+	entries := make(map[shortestPathQueueEntryHash]*shortestPathQueueEntry)
+	queue := &shortestPathQueue{}
 
-	queue.Push(shortestPathQueueEntry{shortestPathQueueEntryHash{0, '@'}, 0})
-	costs[shortestPathQueueEntryHash{0, '@'}] = 0
+	{
+		initialEntry := &shortestPathQueueEntry{
+			shortestPathQueueEntryHash{0, '@'},
+			0,
+			0,
+		}
+		heap.Push(queue, initialEntry)
+		entries[initialEntry.shortestPathQueueEntryHash] = initialEntry
+	}
 
 	for queue.Len() > 0 {
-		e := queue.Pop()
+		e := heap.Pop(queue).(*shortestPathQueueEntry)
 
 		if e.Keys.Len() == allKeysCount {
 			return e.Cost
@@ -199,21 +234,25 @@ func FindShortestPath(g MazeGraph, allKeysCount int) int {
 				continue
 			}
 
-			n := shortestPathQueueEntry{
+			n := &shortestPathQueueEntry{
 				shortestPathQueueEntryHash{e.Keys, neighbor},
-				e.Cost + e.Cost,
+				e.Cost + edge.Steps,
+				-1,
 			}
 			n.Keys.Add(neighbor)
 
 			// Check if a cheaper route to this state exists
-			knownCost, ok := costs[n.shortestPathQueueEntryHash]
-			if ok && knownCost < n.Cost {
+			existing := entries[n.shortestPathQueueEntryHash]
+			if existing != nil && existing.Cost < n.Cost {
 				continue
+			} else if existing != nil {
+				// Remove the more expensive entry from the queue, to keep the queue as short as possible
+				heap.Remove(queue, existing.Index)
 			}
 
 			// Push the new state onto the queue
-			costs[n.shortestPathQueueEntryHash] = n.Cost
-			queue.Push(n)
+			entries[n.shortestPathQueueEntryHash] = n
+			heap.Push(queue, n)
 		}
 	}
 
@@ -222,9 +261,9 @@ func FindShortestPath(g MazeGraph, allKeysCount int) int {
 
 func DumpGraph(g MazeGraph, w io.Writer) {
 	for from, edges := range g {
-		fmt.Fprintf(w, "%c\t->:\n", from)
+		fmt.Fprintf(w, "%c:\n", from)
 		for to, edge := range edges {
-			fmt.Fprintf(w, "\t%c\t%d\n", to, edge.Steps)
+			fmt.Fprintf(w, "\t%c\t%d\t%b\n", to, edge.Steps, edge.Doors)
 		}
 	}
 }
@@ -232,6 +271,6 @@ func DumpGraph(g MazeGraph, w io.Writer) {
 func SolveA(r io.Reader) any {
 	m := LoadMaze(r)
 	g := MazeToSimpleGraph(m)
-	DumpGraph(g, os.Stderr)
+	// DumpGraph(g, os.Stderr)
 	return FindShortestPath(g, len(m.Keys))
 }
