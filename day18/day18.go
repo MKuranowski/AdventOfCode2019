@@ -10,6 +10,7 @@ import (
 
 	"github.com/MKuranowski/AdventOfCode2019/util/ascii"
 	"github.com/MKuranowski/AdventOfCode2019/util/gheap"
+	"golang.org/x/exp/maps"
 )
 
 type Point struct{ X, Y int }
@@ -160,9 +161,9 @@ func generateSimpleEdgesFrom(m MazeData, from Point) (t map[byte]MazeGraphEdge) 
 	return t
 }
 
-func MazeToSimpleGraph(m MazeData) (g MazeGraph) {
+func MazeToSimpleGraph(m MazeData, startCh byte) (g MazeGraph) {
 	g = make(MazeGraph)
-	g['@'] = generateSimpleEdgesFrom(m, m.Start)
+	g[startCh] = generateSimpleEdgesFrom(m, m.Start)
 	for key, pt := range m.Keys {
 		g[key] = generateSimpleEdgesFrom(m, pt)
 	}
@@ -270,7 +271,56 @@ func DumpGraph(g MazeGraph, w io.Writer) {
 
 func SolveA(r io.Reader) any {
 	m := LoadMaze(r)
-	g := MazeToSimpleGraph(m)
+	g := MazeToSimpleGraph(m, '@')
 	// DumpGraph(g, os.Stderr)
 	return FindShortestPath(g, len(m.Keys))
+}
+
+func SplitMaze(m MazeData) (r [4]MazeData) {
+	for i := range r {
+		r[i].M = make(Map)
+		r[i].Keys = make(map[byte]Point)
+		r[i].Doors = make(map[byte]Point)
+	}
+	r[0].Start = Point{m.Start.X - 1, m.Start.Y - 1}
+	r[1].Start = Point{m.Start.X - 1, m.Start.Y + 1}
+	r[2].Start = Point{m.Start.X + 1, m.Start.Y - 1}
+	r[3].Start = Point{m.Start.X + 1, m.Start.Y + 1}
+
+	for pt, c := range m.M {
+		var target *MazeData
+		if pt.X < m.Start.X && pt.Y < m.Start.Y {
+			target = &r[0]
+		} else if pt.X < m.Start.X && pt.Y > m.Start.Y {
+			target = &r[1]
+		} else if pt.X > m.Start.X && pt.Y < m.Start.Y {
+			target = &r[2]
+		} else if pt.X > m.Start.X && pt.Y > m.Start.Y {
+			target = &r[3]
+		} else {
+			continue
+		}
+
+		target.M[pt] = c
+		if ascii.IsLower(c) {
+			target.Keys[c] = pt
+		} else if ascii.IsUpper(c) {
+			target.Doors[c] = pt
+		}
+	}
+
+	return
+}
+
+var startPoints = [4]byte{'1', '2', '3', '4'}
+
+func SolveB(r io.Reader) any {
+	m := LoadMaze(r)
+
+	g := make(MazeGraph)
+	for i, part := range SplitMaze(m) {
+		maps.Copy(g, MazeToSimpleGraph(part, startPoints[i]))
+	}
+
+	return nil
 }
