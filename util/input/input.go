@@ -79,3 +79,16 @@ func AsciiStdoutReceiver(ch <-chan int, wg *sync.WaitGroup) {
 		fmt.Printf("%c", c)
 	}
 }
+
+func AsciiStaticSender(ch chan<- int, wg *sync.WaitGroup, txt string) {
+	defer func() {
+		if wg != nil {
+			wg.Done()
+		}
+	}()
+	defer close(ch)
+
+	for _, c := range txt {
+		ch <- int(c)
+	}
+}
