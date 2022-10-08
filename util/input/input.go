@@ -35,6 +35,14 @@ func (i *LineIterator) Next() bool {
 	return true
 }
 
+func ReadLines(r io.Reader) (lines []string) {
+	l := NewLineIterator(r)
+	for l.Next() {
+		lines = append(lines, l.Get())
+	}
+	return
+}
+
 func StaticSender(ch chan<- int, wg *sync.WaitGroup, numbers ...int) {
 	defer func() {
 		if wg != nil {
