@@ -95,7 +95,11 @@ type Screen struct {
 }
 
 func (s *Screen) Run(ch <-chan int, wg *sync.WaitGroup) {
-	defer wg.Done()
+	defer func() {
+		if wg != nil {
+			wg.Done()
+		}
+	}()
 
 	for c := range ch {
 		if c >= 0x7F {

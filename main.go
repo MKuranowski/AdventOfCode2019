@@ -32,6 +32,7 @@ import (
 	"github.com/MKuranowski/AdventOfCode2019/day22"
 	"github.com/MKuranowski/AdventOfCode2019/day23"
 	"github.com/MKuranowski/AdventOfCode2019/day24"
+	"github.com/MKuranowski/AdventOfCode2019/day25"
 )
 
 var solutions = map[string]func(io.Reader) any{
@@ -83,6 +84,7 @@ var solutions = map[string]func(io.Reader) any{
 	"23b": day23.SolveB,
 	"24a": day24.SolveA,
 	"24b": day24.SolveB,
+	"25a": day25.SolveA,
 }
 
 func loadInput(day string, test bool) io.ReadCloser {

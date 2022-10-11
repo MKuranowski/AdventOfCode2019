@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 )
@@ -89,6 +90,27 @@ func AsciiStaticSender(ch chan<- int, wg *sync.WaitGroup, txt string) {
 	defer close(ch)
 
 	for _, c := range txt {
+		ch <- int(c)
+	}
+}
+
+func AsciiStdinSender(ch chan<- int, wg *sync.WaitGroup) {
+	defer func() {
+		if wg != nil {
+			wg.Done()
+		}
+	}()
+	defer close(ch)
+
+	br := bufio.NewReader(os.Stdin)
+	for {
+		c, err := br.ReadByte()
+		if errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			panic(fmt.Errorf("failed to read from stdin: %w", err))
+		}
+
 		ch <- int(c)
 	}
 }
